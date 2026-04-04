@@ -3,7 +3,7 @@ name: Hourly & Daily Tracker
 on:
   schedule:
     - cron: '0 * * * *'      # 매시간 정각 실행 (팔로워 트래킹용)
-    - cron: '0 0,9 * * *'    # 한국시간 09:00, 18:00 실행 (라이브/소식용)
+    - cron: '0 0,6 * * *'    # 한국시간 09:00, 18:00 실행 (라이브/소식용)
   workflow_dispatch:          # 수동 실행 버튼 활성화
 
 jobs:
