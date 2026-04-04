@@ -4,12 +4,23 @@ const { JWT } = require('google-auth-library');
 
 const SPREADSHEET_ID = '1EHOG5WEbnvilAw-s4zS-ttMbQDFdDXwMjFpnx5JRVPk';
 
-// 한국 시간(KST) 객체를 생성하는 헬퍼 함수
-function getKSTDate() {
-    const curr = new Date();
-    const utc = curr.getTime() + (curr.getTimezoneOffset() * 60 * 1000);
-    const KR_TIME_DIFF = 9 * 60 * 60 * 1000;
-    return new Date(utc + KR_TIME_DIFF);
+// 💡 전역에서 사용할 한국 시간 포맷터
+const kstFormatter = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false
+});
+
+const kstDateFormatter = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+});
+
+// 한국 현재 시간을 Date 객체로 반환하는 함수
+function getKSTNow() {
+    const now = new Date();
+    return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
 }
 
 function getDoc() {
@@ -26,9 +37,8 @@ function getDoc() {
     }));
 }
 
-// 날짜 파싱 (오늘, 내일, 요일 등) - 한국 시간 기준 적용
 function parseGripDateTime(dateStr, timeStr) {
-    const nowKST = getKSTDate();
+    const nowKST = getKSTNow();
     let targetDate = new Date(nowKST);
     
     if (dateStr.includes('내일')) {
@@ -41,19 +51,20 @@ function parseGripDateTime(dateStr, timeStr) {
         targetDate.setDate(nowKST.getDate() + diff);
     }
     
-    const yyyy = targetDate.getFullYear();
-    const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
-    const dd = String(targetDate.getDate()).padStart(2, '0');
+    // YYYYMMDD 포맷 생성
+    const parts = kstDateFormatter.formatToParts(targetDate);
+    const y = parts.find(p => p.type === 'year').value;
+    const m = parts.find(p => p.type === 'month').value;
+    const d = parts.find(p => p.type === 'day').value;
     
     return { 
-        formattedDate: `${yyyy}${mm}${dd}`, 
+        formattedDate: `${y}${m}${d}`, 
         formattedTime: timeStr.replace(/[^0-9:]/g, '') 
     };
 }
 
-// 소식 날짜 추정 (3일 전 등) - 한국 시간 기준 적용
 function parseStoryDate(dateStr) {
-    const nowKST = getKSTDate();
+    const nowKST = getKSTNow();
     let targetDate = new Date(nowKST);
     const value = parseInt(dateStr.replace(/[^0-9]/g, '')) || 0;
     
@@ -61,11 +72,12 @@ function parseStoryDate(dateStr) {
     else if (dateStr.includes('일')) targetDate.setDate(nowKST.getDate() - value);
     else if (dateStr.includes('주')) targetDate.setDate(nowKST.getDate() - (value * 7));
     
-    const yyyy = targetDate.getFullYear();
-    const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
-    const dd = String(targetDate.getDate()).padStart(2, '0');
+    const parts = kstDateFormatter.formatToParts(targetDate);
+    const y = parts.find(p => p.type === 'year').value;
+    const m = parts.find(p => p.type === 'month').value;
+    const d = parts.find(p => p.type === 'day').value;
     
-    return `${yyyy}${mm}${dd}`;
+    return `${y}${m}${d}`;
 }
 
 (async () => {
@@ -79,6 +91,8 @@ function parseStoryDate(dateStr) {
 
     for (const item of targetList) {
         try {
+            const timestamp = kstFormatter.format(new Date()); // 💡 한국 시간대로 포맷팅
+
             // [소식 수집]
             const storyUrl = item.url.replace('tab=live', 'tab=story');
             await page.goto(storyUrl, { waitUntil: 'networkidle' });
@@ -90,17 +104,13 @@ function parseStoryDate(dateStr) {
             });
 
             const storySheet = doc.sheetsByTitle['StoryData'];
-            const nowKST = getKSTDate();
-            const timestamp = nowKST.toLocaleString('ko-KR');
-
             for (const s of stories) {
                 if (!s.content) continue;
-                const fDate = parseStoryDate(s.rawDate);
                 await storySheet.addRow({
                     'Scraped_at': timestamp,
                     'Seller_name': item.name,
                     'Content': s.content,
-                    'Date': fDate,
+                    'Date': parseStoryDate(s.rawDate),
                     'Url': storyUrl
                 });
             }
