@@ -4,23 +4,10 @@ const { JWT } = require('google-auth-library');
 
 const SPREADSHEET_ID = '1EHOG5WEbnvilAw-s4zS-ttMbQDFdDXwMjFpnx5JRVPk';
 
-// 💡 전역에서 사용할 한국 시간 포맷터
-const kstFormatter = new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hour12: false
-});
-
-const kstDateFormatter = new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric', month: '2-digit', day: '2-digit'
-});
-
-// 한국 현재 시간을 Date 객체로 반환하는 함수
-function getKSTNow() {
+// 헬퍼: 한국 시간(KST) 반환
+function getKST() {
     const now = new Date();
-    return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+    return new Date(now.getTime() + (9 * 60 * 60 * 1000));
 }
 
 function getDoc() {
@@ -38,46 +25,32 @@ function getDoc() {
 }
 
 function parseGripDateTime(dateStr, timeStr) {
-    const nowKST = getKSTNow();
-    let targetDate = new Date(nowKST);
-    
-    if (dateStr.includes('내일')) {
-        targetDate.setDate(nowKST.getDate() + 1);
-    } else if (dateStr.includes('요일')) {
+    const kstNow = getKST();
+    let targetDate = new Date(kstNow);
+    if (dateStr.includes('내일')) targetDate.setUTCDate(kstNow.getUTCDate() + 1);
+    else if (dateStr.includes('요일')) {
         const days = ['일','월','화','수','목','금','토'];
-        const currentDay = nowKST.getDay();
-        const targetDay = days.indexOf(dateStr.replace('요일','').trim());
-        const diff = (targetDay - currentDay + 7) % 7 || 7;
-        targetDate.setDate(nowKST.getDate() + diff);
+        const diff = (days.indexOf(dateStr.replace('요일','').trim()) - kstNow.getUTCDay() + 7) % 7 || 7;
+        targetDate.setUTCDate(kstNow.getUTCDate() + diff);
     }
-    
-    // YYYYMMDD 포맷 생성
-    const parts = kstDateFormatter.formatToParts(targetDate);
-    const y = parts.find(p => p.type === 'year').value;
-    const m = parts.find(p => p.type === 'month').value;
-    const d = parts.find(p => p.type === 'day').value;
-    
-    return { 
-        formattedDate: `${y}${m}${d}`, 
-        formattedTime: timeStr.replace(/[^0-9:]/g, '') 
-    };
+    const yyyy = targetDate.getUTCFullYear();
+    const mm = String(targetDate.getUTCMonth()+1).padStart(2,'0');
+    const dd = String(targetDate.getUTCDate()).padStart(2,'0');
+    return { formattedDate: `${yyyy}${mm}${dd}`, formattedTime: timeStr.replace(/[^0-9:]/g, '') };
 }
 
 function parseStoryDate(dateStr) {
-    const nowKST = getKSTNow();
-    let targetDate = new Date(nowKST);
+    const kstNow = getKST();
+    let targetDate = new Date(kstNow);
     const value = parseInt(dateStr.replace(/[^0-9]/g, '')) || 0;
+    if (dateStr.includes('시간')) targetDate.setUTCHours(kstNow.getUTCHours() - value);
+    else if (dateStr.includes('일')) targetDate.setUTCDate(kstNow.getUTCDate() - value);
+    else if (dateStr.includes('주')) targetDate.setUTCDate(kstNow.getUTCDate() - (value * 7));
     
-    if (dateStr.includes('시간')) targetDate.setHours(nowKST.getHours() - value);
-    else if (dateStr.includes('일')) targetDate.setDate(nowKST.getDate() - value);
-    else if (dateStr.includes('주')) targetDate.setDate(nowKST.getDate() - (value * 7));
-    
-    const parts = kstDateFormatter.formatToParts(targetDate);
-    const y = parts.find(p => p.type === 'year').value;
-    const m = parts.find(p => p.type === 'month').value;
-    const d = parts.find(p => p.type === 'day').value;
-    
-    return `${y}${m}${d}`;
+    const yyyy = targetDate.getUTCFullYear();
+    const mm = String(targetDate.getUTCMonth()+1).padStart(2,'0');
+    const dd = String(targetDate.getUTCDate()).padStart(2,'0');
+    return `${yyyy}${mm}${dd}`;
 }
 
 (async () => {
@@ -91,7 +64,8 @@ function parseStoryDate(dateStr) {
 
     for (const item of targetList) {
         try {
-            const timestamp = kstFormatter.format(new Date()); // 💡 한국 시간대로 포맷팅
+            const kstNow = getKST();
+            const timestamp = `${kstNow.getUTCFullYear()}-${String(kstNow.getUTCMonth()+1).padStart(2,'0')}-${String(kstNow.getUTCDate()).padStart(2,'0')} ${String(kstNow.getUTCHours()).padStart(2,'0')}:${String(kstNow.getUTCMinutes()).padStart(2,'0')}:${String(kstNow.getUTCSeconds()).padStart(2,'0')}`;
 
             // [소식 수집]
             const storyUrl = item.url.replace('tab=live', 'tab=story');
@@ -142,9 +116,7 @@ function parseStoryDate(dateStr) {
                 });
             }
             console.log(`✅ [${item.name}] 완료`);
-        } catch (err) { 
-            console.error(`❌ [${item.name}] 에러: ${err.message}`); 
-        }
+        } catch (err) { console.error(`❌ [${item.name}] 에러`); }
     }
     await browser.close();
 })();
