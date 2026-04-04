@@ -4,20 +4,6 @@ const { JWT } = require('google-auth-library');
 
 const SPREADSHEET_ID = '1EHOG5WEbnvilAw-s4zS-ttMbQDFdDXwMjFpnx5JRVPk';
 
-// 💡 한국 시간대(Asia/Seoul) 강제 설정을 위한 포맷터
-const kstFormatter = new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hour12: false
-});
-
-const kstDateParts = new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit'
-});
-
 function getDoc() {
     let credentials;
     if (process.env.GOOGLE_CREDS) {
@@ -36,23 +22,30 @@ async function saveCombinedStats(doc, data) {
     try {
         const sheet = doc.sheetsByTitle['FollowerStats'];
         
+        // 1. 한국 시간(KST) 계산 로직
         const now = new Date();
-        const parts = kstDateParts.formatToParts(now);
-        const yyyy = parts.find(p => p.type === 'year').value;
-        const mm = parts.find(p => p.type === 'month').value;
-        const dd = parts.find(p => p.type === 'day').value;
-        const hour = parts.find(p => p.type === 'hour').value;
-        const checkedAt = kstFormatter.format(now); // 💡 여기서 한국 시간 문자열 생성
+        const kstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+
+        // 2. 한국 시간 기준으로 항목 추출 (getUTC 사용 - 더해진 시간값을 기준으로 추출하기 위함)
+        const yyyy = kstNow.getUTCFullYear();
+        const mm = String(kstNow.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(kstNow.getUTCDate()).padStart(2, '0');
+        const hh = String(kstNow.getUTCHours()).padStart(2, '0');
+        const min = String(kstNow.getUTCMinutes()).padStart(2, '0');
+        const ss = String(kstNow.getUTCSeconds()).padStart(2, '0');
+
+        const formattedDate = `${yyyy}${mm}${dd}`;
+        const formattedCheckedAt = `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
 
         await sheet.addRow({
-            'Date': `${yyyy}${mm}${dd}`,
-            'Hour': parseInt(hour),
-            'Checked_at': checkedAt,
+            'Date': formattedDate,           // 한국 기준 날짜 (YYYYMMDD)
+            'Hour': parseInt(hh),            // 한국 기준 시간 (0~23)
+            'Checked_at': formattedCheckedAt, // 한국 기준 전체 일시 (표준 포맷)
             'Seller_name': data.name,
             'Grip_Followers': data.gripFollowers,
             'Kakao_Followers': data.kakaoFriends
         });
-        console.log(`✅ [${data.name}] 저장 완료 (KST 기준: ${hour}시)`);
+        console.log(`✅ [${data.name}] 저장 완료 (KST: ${formattedCheckedAt})`);
     } catch (err) { 
         console.error(`❌ [${data.name}] 저장 에러: ${err.message}`); 
     }
@@ -71,10 +64,6 @@ async function saveCombinedStats(doc, data) {
     const results = {};
     const browser = await chromium.launch({ headless: true });
 
-    // 💡 로그 시작 시간도 KST 포맷터 사용
-    console.log(`⏱️ 지표 트래킹 시작 (KST): ${kstFormatter.format(new Date())}`);
-
-    console.log('\n--- [Grip 수집] ---');
     for (const item of targetList) {
         const context = await browser.newContext();
         const page = await context.newPage();
@@ -91,14 +80,10 @@ async function saveCombinedStats(doc, data) {
                 return el ? parseInt(el.innerText.replace(/[^0-9]/g, '')) || 0 : 0;
             });
             results[item.name].gripFollowers = count;
-            console.log(`🔍 [Grip] ${item.name}: ${count}`);
-        } catch (err) { 
-            console.error(`❌ [Grip] ${item.name} 오류`); 
-        }
+        } catch (err) { console.error(`❌ [Grip] ${item.name} 오류`); }
         await context.close();
     }
 
-    console.log('\n--- [Kakao 수집] ---');
     for (const item of targetList) {
         if (!item.kakaoUrl || !item.kakaoUrl.includes('kakao.com')) continue;
         const context = await browser.newContext();
@@ -115,18 +100,14 @@ async function saveCombinedStats(doc, data) {
                 return el ? parseInt(el.innerText.replace(/[^0-9]/g, '')) || 0 : 0;
             });
             results[item.name].kakaoFriends = count;
-            console.log(`🔍 [Kakao] ${item.name}: ${count}`);
-        } catch (err) { 
-            console.error(`❌ [Kakao] ${item.name} 오류`); 
-        }
+        } catch (err) { console.error(`❌ [Kakao] ${item.name} 오류`); }
         await context.close();
     }
 
     await browser.close();
 
-    console.log('\n--- [시트 기록] ---');
     for (const key in results) {
         await saveCombinedStats(doc, results[key]);
     }
-    console.log(`\n✅ 모든 수집 완료 (종료 KST: ${kstFormatter.format(new Date())})`);
+    console.log('✅ 모든 수집 완료');
 })();
