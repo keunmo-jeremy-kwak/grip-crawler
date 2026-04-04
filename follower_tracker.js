@@ -21,20 +21,22 @@ function getDoc() {
 
 async function saveCombinedStats(doc, data) {
     try {
-        const sheet = doc.sheetsByTitle['FollowerStats'];
-        const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
+        // 기존: const now = new Date();
+// 수정: 한국 시간으로 오프셋 조정
+const now = new Date(new Date().getTime() + (9 * 60 * 60 * 1000)); 
 
-        await sheet.addRow({
-            'Date': `${yyyy}${mm}${dd}`,
-            'Hour': now.getHours(),
-            'Checked_at': now.toLocaleString('ko-KR'),
-            'Seller_name': data.name,
-            'Grip_Followers': data.gripFollowers,
-            'Kakao_Followers': data.kakaoFriends
-        });
+const yyyy = now.getUTCFullYear();
+const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+const dd = String(now.getUTCDate()).padStart(2, '0');
+
+await sheet.addRow({
+    'Date': `${yyyy}${mm}${dd}`,
+    'Hour': now.getUTCHours(), // 한국 시간 기준 시(hour)
+    'Checked_at': now.toISOString().replace('T', ' ').substring(0, 19), // ISO 형식을 한국 시간대로 활용
+    'Seller_name': data.name,
+    'Grip_Followers': data.gripFollowers,
+    'Kakao_Followers': data.kakaoFriends
+});
         console.log(`✅ [${data.name}] 저장 완료 (G:${data.gripFollowers} / K:${data.kakaoFriends})`);
     } catch (err) { console.error(`❌ 저장 에러: ${err.message}`); }
 }
