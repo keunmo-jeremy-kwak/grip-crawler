@@ -85,7 +85,7 @@ async function saveCombinedStats(doc, data) {
             await page.waitForFunction(() => {
                 const el = document.querySelector('.follower');
                 return el && /\d/.test(el.innerText);
-            }, { timeout: 8000 }).catch(() => {});
+            }, { timeout: 5000 }).catch(() => {});
             
             const count = await page.evaluate(() => {
                 const el = document.querySelector('.follower');
@@ -110,7 +110,7 @@ async function saveCombinedStats(doc, data) {
             await page.waitForFunction(() => {
                 const el = document.querySelector('.txt_friends');
                 return el && /\d/.test(el.innerText);
-            }, { timeout: 8000 }).catch(() => {});
+            }, { timeout: 5000 }).catch(() => {});
             
             const count = await page.evaluate(() => {
                 const el = document.querySelector('.txt_friends');
