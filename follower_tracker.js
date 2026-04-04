@@ -36,14 +36,13 @@ async function saveCombinedStats(doc, data) {
     try {
         const sheet = doc.sheetsByTitle['FollowerStats'];
         
-        // 💡 현재 시간을 한국 시간 기준으로 파싱
         const now = new Date();
         const parts = kstDateParts.formatToParts(now);
         const yyyy = parts.find(p => p.type === 'year').value;
         const mm = parts.find(p => p.type === 'month').value;
         const dd = parts.find(p => p.type === 'day').value;
         const hour = parts.find(p => p.type === 'hour').value;
-        const checkedAt = kstFormatter.format(now);
+        const checkedAt = kstFormatter.format(now); // 💡 여기서 한국 시간 문자열 생성
 
         await sheet.addRow({
             'Date': `${yyyy}${mm}${dd}`,
@@ -53,7 +52,7 @@ async function saveCombinedStats(doc, data) {
             'Grip_Followers': data.gripFollowers,
             'Kakao_Followers': data.kakaoFriends
         });
-        console.log(`✅ [${data.name}] 저장 완료 (시간: ${hour}시)`);
+        console.log(`✅ [${data.name}] 저장 완료 (KST 기준: ${hour}시)`);
     } catch (err) { 
         console.error(`❌ [${data.name}] 저장 에러: ${err.message}`); 
     }
@@ -72,9 +71,9 @@ async function saveCombinedStats(doc, data) {
     const results = {};
     const browser = await chromium.launch({ headless: true });
 
+    // 💡 로그 시작 시간도 KST 포맷터 사용
     console.log(`⏱️ 지표 트래킹 시작 (KST): ${kstFormatter.format(new Date())}`);
 
-    // --- [1단계: 그립 수집] ---
     console.log('\n--- [Grip 수집] ---');
     for (const item of targetList) {
         const context = await browser.newContext();
@@ -94,12 +93,11 @@ async function saveCombinedStats(doc, data) {
             results[item.name].gripFollowers = count;
             console.log(`🔍 [Grip] ${item.name}: ${count}`);
         } catch (err) { 
-            console.error(`❌ [Grip] ${item.name} 오류: ${err.message}`); 
+            console.error(`❌ [Grip] ${item.name} 오류`); 
         }
         await context.close();
     }
 
-    // --- [2단계: 카카오 수집] ---
     console.log('\n--- [Kakao 수집] ---');
     for (const item of targetList) {
         if (!item.kakaoUrl || !item.kakaoUrl.includes('kakao.com')) continue;
@@ -119,17 +117,16 @@ async function saveCombinedStats(doc, data) {
             results[item.name].kakaoFriends = count;
             console.log(`🔍 [Kakao] ${item.name}: ${count}`);
         } catch (err) { 
-            console.error(`❌ [Kakao] ${item.name} 오류: ${err.message}`); 
+            console.error(`❌ [Kakao] ${item.name} 오류`); 
         }
         await context.close();
     }
 
     await browser.close();
 
-    // --- [3단계: 시트 저장] ---
     console.log('\n--- [시트 기록] ---');
     for (const key in results) {
         await saveCombinedStats(doc, results[key]);
     }
-    console.log('\n✅ 모든 수집 및 기록 완료');
+    console.log(`\n✅ 모든 수집 완료 (종료 KST: ${kstFormatter.format(new Date())})`);
 })();
