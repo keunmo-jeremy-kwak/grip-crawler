@@ -2,7 +2,7 @@ name: Hourly & Daily Tracker
 
 on:
   schedule:
-    - cron: '0 * * * *'      # 매시간 정각 실행 (팔로워 트래킹용)
+    - cron: '0 3,15,21 * * *'      # 팔로워 트래킹용
     - cron: '0 0,6 * * *'    # 한국시간 09:00, 15:00 실행 (라이브/소식용)
   workflow_dispatch:          # 수동 실행 버튼 활성화
 
@@ -25,7 +25,7 @@ jobs:
 
       - name: Run Follower Tracker
         # 매시간 실행 설정
-        if: github.event.schedule == '0 * * * *' || github.event_name == 'workflow_dispatch'
+        if: github.event.schedule == '0 3,15,21 * * *' || github.event_name == 'workflow_dispatch'
         env:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
         run: node follower_tracker.js
