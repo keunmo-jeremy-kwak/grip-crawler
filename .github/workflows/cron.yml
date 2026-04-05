@@ -24,7 +24,7 @@ jobs:
           npx playwright install chromium
 
       - name: Run Follower Tracker
-        # 매시간 실행 설정
+        # 오전 6시, 오후 12시, 오후 6시 실행 설정
         if: github.event.schedule == '0 3,15,21 * * *' || github.event_name == 'workflow_dispatch'
         env:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
