@@ -2,9 +2,11 @@ name: Hourly & Daily Tracker
 
 on:
   schedule:
-    - cron: '0 3,15,21 * * *'      # 팔로워 트래킹용
-    - cron: '0 0,6 * * *'    # 한국시간 09:00, 15:00 실행 (라이브/소식용)
-  workflow_dispatch:          # 수동 실행 버튼 활성화
+    # 1. 팔로워 트래킹 (한국 시간 12:00, 00:00, 06:00 -> UTC 03, 15, 21)
+    - cron: '0 3,15,21 * * *'
+    # 2. 라이브/소식 (한국 시간 09:00, 15:00 -> UTC 00, 06)
+    - cron: '0 0,6 * * *'
+  workflow_dispatch: # 수동 실행 버튼 활성화
 
 jobs:
   track:
@@ -16,23 +18,29 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '20'
 
       - name: Install dependencies
         run: |
           npm install
           npx playwright install chromium
 
+      # --- [팔로워 트래커 실행 조건] ---
       - name: Run Follower Tracker
-        # 오전 6시, 오후 12시, 오후 6시 실행 설정
-        if: github.event.schedule == '0 3,15,21 * * *' || github.event_name == 'workflow_dispatch'
+        # 수동으로 눌렀거나, 팔로워용 크론 시간대일 때 실행
+        if: |
+          github.event_name == 'workflow_dispatch' || 
+          github.event.schedule == '0 3,15,21 * * *'
         env:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
         run: node follower_tracker.js
 
+      # --- [라이브/소식 크롤러 실행 조건] ---
       - name: Run Live/Story Crawler
-        # 오전 9시, 오후 6시 실행 설정
-        if: github.event.schedule == '0 0,6 * * *' || github.event_name == 'workflow_dispatch'
+        # 수동으로 눌렀거나, 라이브용 크론 시간대일 때 실행
+        if: |
+          github.event_name == 'workflow_dispatch' || 
+          github.event.schedule == '0 0,6 * * *'
         env:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
         run: node seller-live.js
