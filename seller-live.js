@@ -97,6 +97,29 @@ function formatKstDateTime(date = new Date()) {
     }).format(date);
 }
 
+function parseTimeTo24Hour(timeStr) {
+    const normalized = String(timeStr || '').trim();
+    if (!normalized) return '';
+
+    const meridiemMatch = normalized.match(/(오전|오후|아침|점심|저녁|밤|새벽|am|pm)/i);
+    const timeMatch = normalized.match(/(\d{1,2})(?::(\d{1,2}))?/);
+    if (!timeMatch) return String(normalized).replace(/[^0-9:]/g, '');
+
+    let hour = parseInt(timeMatch[1], 10);
+    let minute = parseInt(timeMatch[2] || '0', 10);
+    if (Number.isNaN(hour) || Number.isNaN(minute) || minute < 0 || minute > 59) return '';
+
+    const meridiem = (meridiemMatch?.[1] || '').toLowerCase();
+    const isPm = ['오후', '점심', '저녁', '밤', 'pm'].includes(meridiem);
+    const isAm = ['오전', '아침', '새벽', 'am'].includes(meridiem);
+
+    if (isPm && hour < 12) hour += 12;
+    if (isAm && hour === 12) hour = 0;
+
+    if (hour < 0 || hour > 23) return '';
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
 // 날짜 파싱 (오늘, 내일, 요일 등)
 function parseGripDateTime(dateStr, timeStr) {
     const now = getKstNowDate();
@@ -112,7 +135,7 @@ function parseGripDateTime(dateStr, timeStr) {
         const diff = (days.indexOf(dayText) - now.getUTCDay() + 7) % 7 || 7;
         targetDate.setUTCDate(now.getUTCDate() + diff);
     }
-    return { formattedDate: formatDate(targetDate), formattedTime: String(timeStr || '').replace(/[^0-9:]/g, '') };
+    return { formattedDate: formatDate(targetDate), formattedTime: parseTimeTo24Hour(timeStr) };
 }
 
 // 소식 날짜 추정 (어제, 오늘, 3일 전, 2026년 1월 20일 등)
