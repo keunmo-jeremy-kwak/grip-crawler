@@ -2,10 +2,10 @@ name: Hourly & Daily Tracker
 
 on:
   schedule:
-    # 1. 팔로워 트래킹 (한국 시간 12:00, 00:00, 06:00 -> UTC 03, 15, 21)
-    - cron: '0 3,15,21 * * *'
-    # 2. 라이브/소식 (한국 시간 09:00, 15:00 -> UTC 00, 06)
-    - cron: '0 0,6 * * *'
+    # 1. 팔로워 트래킹 (한국 시간 12:07, 00:07, 06:07 -> UTC 03, 15, 21)
+    - cron: '7 3,15,21 * * *'
+    # 2. 라이브/소식 (한국 시간 09:07, 15:07 -> UTC 00, 06)
+    - cron: '7 0,6 * * *'
   workflow_dispatch: # 수동 실행 버튼 활성화
 
 jobs:
@@ -27,20 +27,20 @@ jobs:
 
       # --- [팔로워 트래커 실행 조건] ---
       - name: Run Follower Tracker
-        # 수동으로 눌렀거나, 팔로워용 크론 시간대일 때 실행
+        # 수동 실행이거나, 팔로워용 크론 시간대(3, 15, 21시)일 때 실행
         if: |
           github.event_name == 'workflow_dispatch' || 
-          github.event.schedule == '0 3,15,21 * * *'
+          contains(github.event.schedule, '7 3,15,21')
         env:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
         run: node follower_tracker.js
 
       # --- [라이브/소식 크롤러 실행 조건] ---
       - name: Run Live/Story Crawler
-        # 수동으로 눌렀거나, 라이브용 크론 시간대일 때 실행
+        # 수동 실행이거나, 라이브용 크론 시간대(0, 6시)일 때 실행
         if: |
           github.event_name == 'workflow_dispatch' || 
-          github.event.schedule == '0 0,6 * * *'
+          contains(github.event.schedule, '7 0,6')
         env:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
         run: node seller-live.js
