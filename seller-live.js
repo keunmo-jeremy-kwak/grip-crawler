@@ -55,10 +55,33 @@ function getDoc() {
 }
 
 function formatDate(date) {
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
+    const yyyy = date.getUTCFullYear();
+    const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(date.getUTCDate()).padStart(2, '0');
     return `${yyyy}${mm}${dd}`;
+}
+
+function getKstNowDate() {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    }).formatToParts(new Date());
+
+    const data = Object.fromEntries(parts.map(p => [p.type, p.value]));
+    return new Date(Date.UTC(
+        Number(data.year),
+        Number(data.month) - 1,
+        Number(data.day),
+        Number(data.hour),
+        Number(data.minute),
+        Number(data.second)
+    ));
 }
 
 function formatKstDateTime(date = new Date()) {
@@ -76,25 +99,25 @@ function formatKstDateTime(date = new Date()) {
 
 // 날짜 파싱 (오늘, 내일, 요일 등)
 function parseGripDateTime(dateStr, timeStr) {
-    const now = new Date();
+    const now = getKstNowDate();
     let targetDate = new Date(now);
     const normalized = String(dateStr || '').trim();
     if (/오늘/.test(normalized)) {
         // today
     } else if (/내일/.test(normalized)) {
-        targetDate.setDate(now.getDate() + 1);
+        targetDate.setUTCDate(now.getUTCDate() + 1);
     } else if (/요일/.test(normalized)) {
         const days = ['일', '월', '화', '수', '목', '금', '토'];
         const dayText = normalized.replace('요일', '').trim();
-        const diff = (days.indexOf(dayText) - now.getDay() + 7) % 7 || 7;
-        targetDate.setDate(now.getDate() + diff);
+        const diff = (days.indexOf(dayText) - now.getUTCDay() + 7) % 7 || 7;
+        targetDate.setUTCDate(now.getUTCDate() + diff);
     }
     return { formattedDate: formatDate(targetDate), formattedTime: String(timeStr || '').replace(/[^0-9:]/g, '') };
 }
 
 // 소식 날짜 추정 (어제, 오늘, 3일 전, 2026년 1월 20일 등)
 function parseStoryDate(dateStr) {
-    const now = new Date();
+    const now = getKstNowDate();
     let targetDate = new Date(now);
     const normalized = String(dateStr || '').trim();
     if (!normalized) return formatDate(now);
@@ -103,36 +126,36 @@ function parseStoryDate(dateStr) {
         return formatDate(now);
     }
     if (/어제/.test(normalized)) {
-        targetDate.setDate(now.getDate() - 1);
+        targetDate.setUTCDate(now.getUTCDate() - 1);
         return formatDate(targetDate);
     }
     if (/그제/.test(normalized)) {
-        targetDate.setDate(now.getDate() - 2);
+        targetDate.setUTCDate(now.getUTCDate() - 2);
         return formatDate(targetDate);
     }
     if (/([0-9]+)분/.test(normalized)) {
         const value = parseInt(normalized.match(/([0-9]+)분/)[1], 10);
-        targetDate.setMinutes(now.getMinutes() - value);
+        targetDate.setUTCMinutes(now.getUTCMinutes() - value);
         return formatDate(targetDate);
     }
     if (/([0-9]+)시간/.test(normalized)) {
         const value = parseInt(normalized.match(/([0-9]+)시간/)[1], 10);
-        targetDate.setHours(now.getHours() - value);
+        targetDate.setUTCHours(now.getUTCHours() - value);
         return formatDate(targetDate);
     }
     if (/([0-9]+)일 전/.test(normalized)) {
         const value = parseInt(normalized.match(/([0-9]+)일 전/)[1], 10);
-        targetDate.setDate(now.getDate() - value);
+        targetDate.setUTCDate(now.getUTCDate() - value);
         return formatDate(targetDate);
     }
     if (/([0-9]+)주 전/.test(normalized)) {
         const value = parseInt(normalized.match(/([0-9]+)주 전/)[1], 10);
-        targetDate.setDate(now.getDate() - value * 7);
+        targetDate.setUTCDate(now.getUTCDate() - value * 7);
         return formatDate(targetDate);
     }
     if (/([0-9]+)개월 전/.test(normalized)) {
         const value = parseInt(normalized.match(/([0-9]+)개월 전/)[1], 10);
-        targetDate.setMonth(now.getMonth() - value);
+        targetDate.setUTCMonth(now.getUTCMonth() - value);
         return formatDate(targetDate);
     }
     const fullDateMatch = normalized.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
@@ -140,15 +163,15 @@ function parseStoryDate(dateStr) {
         const year = parseInt(fullDateMatch[1], 10);
         const month = parseInt(fullDateMatch[2], 10) - 1;
         const day = parseInt(fullDateMatch[3], 10);
-        targetDate = new Date(year, month, day);
+        targetDate = new Date(Date.UTC(year, month, day));
         return formatDate(targetDate);
     }
-    const slashDateMatch = normalized.match(/(\d{4})[-.\/](\d{1,2})[-.\/](1,2})/);
+    const slashDateMatch = normalized.match(/(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/);
     if (slashDateMatch) {
         const year = parseInt(slashDateMatch[1], 10);
         const month = parseInt(slashDateMatch[2], 10) - 1;
         const day = parseInt(slashDateMatch[3], 10);
-        targetDate = new Date(year, month, day);
+        targetDate = new Date(Date.UTC(year, month, day));
         return formatDate(targetDate);
     }
     return formatDate(now);
