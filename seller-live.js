@@ -2,16 +2,56 @@ const { chromium } = require('playwright');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
 const { JWT } = require('google-auth-library');
 
-const SPREADSHEET_ID = '1EHOG5WEbnvilAw-s4zS-ttMbQDFdDXwMjFpnx5JRVPk';
+const SPREADSHEET_ID = process.env.SPREADSHEET_ID || '1EHOG5WEbnvilAw-s4zS-ttMbQDFdDXwMjFpnx5JRVPk';
 
 function getDoc() {
-    const credentials = require('./secret.json');
+    let credentials = null;
 
-    return new GoogleSpreadsheet(SPREADSHEET_ID, new JWT({
+    // 1. 로컬 환경 확인: secret.json 파일이 있는지 먼저 시도
+    try {
+        credentials = require('./secret.json');
+    } catch (err) {
+        // 파일이 없는 경우(MODULE_NOT_FOUND)는 정상적인 시나리오(CI/CD 환경 등)이므로 무시
+        if (err.code !== 'MODULE_NOT_FOUND') throw err;
+    }
+
+    // 2. 환경 변수 확인: 파일이 없으면 GOOGLE_CREDS(JSON 문자열) 확인
+    if (!credentials && process.env.GOOGLE_CREDS) {
+        try {
+            credentials = JSON.parse(process.env.GOOGLE_CREDS);
+        } catch (err) {
+            throw new Error('GOOGLE_CREDS 환경 변수가 올바른 JSON 형식이 아닙니다.');
+        }
+    }
+
+    // 3. 개별 환경 변수 확인: 개별 키(Email, Key)가 설정되어 있는지 확인
+    if (!credentials) {
+        const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+        const privateKey = process.env.GOOGLE_PRIVATE_KEY;
+
+        if (clientEmail && privateKey) {
+            credentials = {
+                client_email: clientEmail,
+                private_key: privateKey.replace(/\\n/g, '\n') // 개행 문자 처리
+            };
+        }
+    }
+
+    // 최종 검증: 모든 수단을 동원해도 인증 정보가 없으면 에러
+    if (!credentials || !credentials.client_email || !credentials.private_key) {
+        throw new Error(
+            '인증 정보를 찾을 수 없습니다. (secret.json 파일, GOOGLE_CREDS, 또는 개별 환경 변수를 설정해주세요.)'
+        );
+    }
+
+    // JWT 객체 생성 및 GoogleSpreadsheet 인스턴스 반환
+    const serviceAccountAuth = new JWT({
         email: credentials.client_email,
         key: credentials.private_key,
         scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    }));
+    });
+
+    return new GoogleSpreadsheet(SPREADSHEET_ID, serviceAccountAuth);
 }
 
 function formatDate(date) {
@@ -31,8 +71,8 @@ function parseGripDateTime(dateStr, timeStr) {
     } else if (/내일/.test(normalized)) {
         targetDate.setDate(now.getDate() + 1);
     } else if (/요일/.test(normalized)) {
-        const days = ['일','월','화','수','목','금','토'];
-        const dayText = normalized.replace('요일','').trim();
+        const days = ['일', '월', '화', '수', '목', '금', '토'];
+        const dayText = normalized.replace('요일', '').trim();
         const diff = (days.indexOf(dayText) - now.getDay() + 7) % 7 || 7;
         targetDate.setDate(now.getDate() + diff);
     }
@@ -217,7 +257,7 @@ function buildStoryKey(sellerName, content, date) {
             let liveSavedCount = 0;
             for (const l of liveResult.parsedItems) {
                 const { formattedDate, formattedTime } = parseGripDateTime(l.date, l.time);
-                console.log(`   [Live] title="${l.title.substring(0,50)}" date="${l.date}" time="${l.time}" -> ${formattedDate} ${formattedTime}`);
+                console.log(`   [Live] title="${l.title.substring(0, 50)}" date="${l.date}" time="${l.time}" -> ${formattedDate} ${formattedTime}`);
                 await liveSheet.addRow({
                     'Scraped_at': new Date().toLocaleString(),
                     'Seller_name': item.name,
