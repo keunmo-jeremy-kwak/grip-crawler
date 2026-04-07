@@ -129,11 +129,25 @@ function parseGripDateTime(dateStr, timeStr) {
         // today
     } else if (/내일/.test(normalized)) {
         targetDate.setUTCDate(now.getUTCDate() + 1);
+    } else if (/(\d{1,2})\s*[./-]\s*(\d{1,2})/.test(normalized)) {
+        const matched = normalized.match(/(\d{1,2})\s*[./-]\s*(\d{1,2})/);
+        const month = parseInt(matched[1], 10) - 1;
+        const day = parseInt(matched[2], 10);
+        targetDate = new Date(Date.UTC(now.getUTCFullYear(), month, day));
+    } else if (/(\d{1,2})월\s*(\d{1,2})일/.test(normalized)) {
+        const matched = normalized.match(/(\d{1,2})월\s*(\d{1,2})일/);
+        const month = parseInt(matched[1], 10) - 1;
+        const day = parseInt(matched[2], 10);
+        targetDate = new Date(Date.UTC(now.getUTCFullYear(), month, day));
     } else if (/요일/.test(normalized)) {
         const days = ['일', '월', '화', '수', '목', '금', '토'];
         const dayText = normalized.replace('요일', '').trim();
-        const diff = (days.indexOf(dayText) - now.getUTCDay() + 7) % 7 || 7;
-        targetDate.setUTCDate(now.getUTCDate() + diff);
+        const targetDayIndex = days.indexOf(dayText);
+        if (targetDayIndex >= 0) {
+            // 요일 표기는 최근 6일 데이터(오늘 포함)로 간주하여 과거 기준으로 계산
+            const diff = (now.getUTCDay() - targetDayIndex + 7) % 7;
+            targetDate.setUTCDate(now.getUTCDate() - diff);
+        }
     }
     return { formattedDate: formatDate(targetDate), formattedTime: parseTimeTo24Hour(timeStr) };
 }
