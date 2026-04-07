@@ -61,6 +61,19 @@ function formatDate(date) {
     return `${yyyy}${mm}${dd}`;
 }
 
+function formatKstDateTime(date = new Date()) {
+    return new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    }).format(date);
+}
+
 // 날짜 파싱 (오늘, 내일, 요일 등)
 function parseGripDateTime(dateStr, timeStr) {
     const now = new Date();
@@ -148,6 +161,13 @@ function buildStoryKey(sellerName, content, date) {
     return `${normalizedSeller}|${normalizedContent}|${normalizedDate}`;
 }
 
+function buildLiveKey(sellerName, date, time) {
+    const normalizedSeller = String(sellerName || '').trim();
+    const normalizedDate = String(date || '').trim();
+    const normalizedTime = String(time || '').trim();
+    return `${normalizedSeller}|${normalizedDate}|${normalizedTime}`;
+}
+
 (async () => {
     const doc = getDoc();
     await doc.loadInfo();
@@ -158,6 +178,11 @@ function buildStoryKey(sellerName, content, date) {
     const storyExistingRows = await storySheet.getRows();
     const storyExistingKeys = new Set(
         storyExistingRows.map(r => buildStoryKey(r.get('Seller_name'), r.get('Content'), r.get('Date')))
+    );
+    const liveSheet = doc.sheetsByTitle['LiveSchedule'];
+    const liveExistingRows = await liveSheet.getRows();
+    const liveExistingKeys = new Set(
+        liveExistingRows.map(r => buildLiveKey(r.get('Seller_name'), r.get('Date'), r.get('Time')))
     );
 
     const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-web-security'] });
@@ -206,7 +231,7 @@ function buildStoryKey(sellerName, content, date) {
                 }
                 console.log(`   [Story] content="${s.content.substring(0, 60)}" rawDate="${s.rawDate}" -> ${fDate}`);
                 await storySheet.addRow({
-                    'Scraped_at': new Date().toLocaleString(),
+                    'Scraped_at': formatKstDateTime(),
                     'Seller_name': item.name,
                     'Content': s.content,
                     'Date': fDate,
@@ -253,25 +278,32 @@ function buildStoryKey(sellerName, content, date) {
                 console.log(`   🔎 sample title="${liveResult.sampleItem.title}" date="${liveResult.sampleItem.date}" time="${liveResult.sampleItem.time}" hasSchedule=${liveResult.sampleItem.hasSchedule}`);
             }
 
-            const liveSheet = doc.sheetsByTitle['LiveSchedule'];
             let liveSavedCount = 0;
+            let liveSkippedCount = 0;
             for (const l of liveResult.parsedItems) {
                 const { formattedDate, formattedTime } = parseGripDateTime(l.date, l.time);
+                const liveKey = buildLiveKey(item.name, formattedDate, formattedTime);
+                if (liveExistingKeys.has(liveKey)) {
+                    console.log(`   ↩️ [Live] 중복 건너뜀 date="${formattedDate}" time="${formattedTime}"`);
+                    liveSkippedCount += 1;
+                    continue;
+                }
                 console.log(`   [Live] title="${l.title.substring(0, 50)}" date="${l.date}" time="${l.time}" -> ${formattedDate} ${formattedTime}`);
                 await liveSheet.addRow({
-                    'Scraped_at': new Date().toLocaleString(),
+                    'Scraped_at': formatKstDateTime(),
                     'Seller_name': item.name,
                     'Title': l.title,
                     'Date': formattedDate,
                     'Time': formattedTime,
                     'Url': item.url
                 });
+                liveExistingKeys.add(liveKey);
                 liveSavedCount += 1;
             }
             if (liveResult.parsedItems.length === 0) {
                 console.log(`   ⚠️ live 항목 없음 또는 schedule-cover 미발견`);
             }
-            console.log(`   ✅ live 저장: ${liveSavedCount}개`);
+            console.log(`   ✅ live 저장: ${liveSavedCount}개 (중복 스킵: ${liveSkippedCount}개)`);
             console.log(`✅ [${item.name}] 완료`);
         } catch (err) { console.error(`❌ [${item.name}] 에러`, err.message); }
     }
