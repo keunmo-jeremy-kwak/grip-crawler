@@ -26,16 +26,12 @@ jobs:
           npm install
           npx playwright install chromium
 
-      # --- [팔로워 트래커 실행 조건] ---
       - name: Run Follower Tracker
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '7 3,15,21 * * *'
         env:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
         run: node follower_tracker.js
 
-      # --- [라이브/소식 크롤러 실행 조건] ---
       - name: Run Live/Story Crawler
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '7 0,6 * * *'
         env:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
         run: node seller-live.js
