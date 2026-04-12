@@ -144,9 +144,9 @@ function parseGripDateTime(dateStr, timeStr) {
         const dayText = normalized.replace('요일', '').trim();
         const targetDayIndex = days.indexOf(dayText);
         if (targetDayIndex >= 0) {
-            // 라이브 일정의 요일 표기는 미래 날짜 기준 (오늘 포함, 가장 가까운 미래)
-            const diff = (targetDayIndex - now.getUTCDay() + 7) % 7;
-            targetDate.setUTCDate(now.getUTCDate() + diff);
+            // 요일 표기는 최근 6일 데이터(오늘 포함)로 간주하여 과거 기준으로 계산
+            const diff = (now.getUTCDay() - targetDayIndex + 7) % 7;
+            targetDate.setUTCDate(now.getUTCDate() - diff);
         }
     }
     return { formattedDate: formatDate(targetDate), formattedTime: parseTimeTo24Hour(timeStr) };
@@ -315,30 +315,27 @@ function buildLiveKey(sellerName, date, time) {
             const liveResult = await page.evaluate(() => {
                 const contentItems = Array.from(document.querySelectorAll('.content-list-item'));
                 const parsedItems = contentItems.map(el => {
-                    // .badge가 있는 카드 = 예고 카드 (예고/앵코르 등 모두 포함)
-                    const badge = el.querySelector('.badge');
-                    if (!badge) return null;
-
-                    // date/time은 .schedule-cover 안에 있거나 .content-cover 안에 직접 있을 수 있음
-                    const dateSel = el.querySelector('.schedule-cover .date') || el.querySelector('.content-cover .date');
-                    const timeSel = el.querySelector('.schedule-cover .time') || el.querySelector('.content-cover .time');
+                    const sched = el.querySelector('.schedule-cover');
                     return {
                         title: el.querySelector('.title')?.innerText || "",
-                        date: dateSel?.innerText || "",
-                        time: timeSel?.innerText || "",
-                        badge: badge.innerText || "",
+                        date: sched?.querySelector('.date')?.innerText || "",
+                        time: sched?.querySelector('.time')?.innerText || "",
+                        hasSchedule: !!sched,
+                        html: el.innerHTML.slice(0, 200)
                     };
-                }).filter(Boolean);
+                });
                 return {
                     totalItems: contentItems.length,
-                    parsedItems,
-                    badgeCount: document.querySelectorAll('.content-list-item .badge').length,
+                    parsedItems: parsedItems.filter(i => i.hasSchedule),
+                    foundScheduleCount: parsedItems.filter(i => i.hasSchedule).length,
+                    contentListCount: document.querySelectorAll('.content-list-item').length,
+                    scheduleCoverCount: document.querySelectorAll('.content-list-item .schedule-cover').length,
                     sampleItem: parsedItems[0] || null,
                 };
             });
-            console.log(`   📊 live items total=${liveResult.totalItems}, badge=${liveResult.badgeCount}, parsed=${liveResult.parsedItems.length}`);
+            console.log(`   📊 live items total=${liveResult.totalItems}, scheduleCover=${liveResult.scheduleCoverCount}, parsed=${liveResult.parsedItems.length}`);
             if (liveResult.sampleItem) {
-                console.log(`   🔎 sample title="${liveResult.sampleItem.title}" badge="${liveResult.sampleItem.badge}" date="${liveResult.sampleItem.date}" time="${liveResult.sampleItem.time}"`);
+                console.log(`   🔎 sample title="${liveResult.sampleItem.title}" date="${liveResult.sampleItem.date}" time="${liveResult.sampleItem.time}" hasSchedule=${liveResult.sampleItem.hasSchedule}`);
             }
 
             let liveSavedCount = 0;
@@ -364,7 +361,7 @@ function buildLiveKey(sellerName, date, time) {
                 liveSavedCount += 1;
             }
             if (liveResult.parsedItems.length === 0) {
-                console.log(`   ⚠️ live 항목 없음 또는 badge 카드 미발견`);
+                console.log(`   ⚠️ live 항목 없음 또는 schedule-cover 미발견`);
             }
             console.log(`   ✅ live 저장: ${liveSavedCount}개 (중복 스킵: ${liveSkippedCount}개)`);
             console.log(`✅ [${item.name}] 완료`);
