@@ -80,7 +80,7 @@ async function saveCombinedStats(doc, data) {
                 return el ? parseInt(el.innerText.replace(/[^0-9]/g, '')) || 0 : 0;
             });
             results[item.name].gripFollowers = count;
-        } catch (err) { console.error(`❌ [Grip] ${item.name} 오류`); }
+        } catch (err) { console.error(`❌ [Grip] ${item.name} 오류: ${err.message}`); }
         await context.close();
     }
 
@@ -100,7 +100,7 @@ async function saveCombinedStats(doc, data) {
                 return el ? parseInt(el.innerText.replace(/[^0-9]/g, '')) || 0 : 0;
             });
             results[item.name].kakaoFriends = count;
-        } catch (err) { console.error(`❌ [Kakao] ${item.name} 오류`); }
+        } catch (err) { console.error(`❌ [Kakao] ${item.name} 오류: ${err.message}`); }
         await context.close();
     }
 
