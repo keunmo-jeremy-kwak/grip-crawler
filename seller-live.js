@@ -224,9 +224,15 @@ function buildStoryKey(sellerName, content, date) {
 function buildLiveKey(sellerName, date, time) {
     const normalizedSeller = String(sellerName || '').trim();
     const normalizedDate = String(date || '').trim();
-    const normalizedTime = String(time || '').trim();
+    const rawTime = String(time || '').trim();
+    // 9:00과 09:00 모두 09:00으로 정규화
+    const timeMatch = rawTime.match(/^(\d{1,2}):(\d{2})$/);
+    const normalizedTime = timeMatch
+        ? `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`
+        : rawTime;
     return `${normalizedSeller}|${normalizedDate}|${normalizedTime}`;
 }
+
 
 (async () => {
     const doc = getDoc();
