@@ -29,7 +29,11 @@ function getDoc() {
     })).filter(i => i.gripUrl);
 
     const results = {};
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({
+        headless: true,
+        args: ['--no-sandbox'],
+        ...(process.env.CHROMIUM_PATH && { executablePath: process.env.CHROMIUM_PATH }),
+    });
 
     for (const item of targetList) {
         const context = await browser.newContext();

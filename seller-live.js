@@ -251,7 +251,11 @@ function buildLiveKey(sellerName, date, time) {
         liveExistingRows.map(r => buildLiveKey(r.get('Seller_name'), r.get('Date'), r.get('Time')))
     );
 
-    const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-web-security'] });
+    const browser = await chromium.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-web-security'],
+        ...(process.env.CHROMIUM_PATH && { executablePath: process.env.CHROMIUM_PATH }),
+    });
     const context = await browser.newContext({
         userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
         locale: 'ko-KR',

@@ -21,26 +21,17 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ hashFiles('package-lock.json') }}
-
       - name: Install dependencies
         run: npm install
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install chromium
 
       - name: Run Follower Tracker
         env:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
+          CHROMIUM_PATH: /usr/bin/google-chrome
         run: node follower_tracker.js
 
       - name: Run Live/Story Crawler
         env:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
+          CHROMIUM_PATH: /usr/bin/google-chrome
         run: node seller-live.js
