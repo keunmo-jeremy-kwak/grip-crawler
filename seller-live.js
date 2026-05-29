@@ -264,7 +264,8 @@ function buildLiveKey(sellerName, date, time) {
             // [소식 수집]
             const storyUrl = item.url.replace('tab=live', 'tab=story');
             console.log(`🔎 [${item.name}] story 페이지 이동: ${storyUrl}`);
-            await page.goto(storyUrl, { waitUntil: 'networkidle' });
+            await page.goto(storyUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await page.waitForTimeout(2000);
             const storyResult = await page.evaluate(() => {
                 const cards = Array.from(document.querySelectorAll('.story-item.white, .story-item'));
                 const items = cards.slice(0, 3).map(card => {
@@ -310,8 +311,8 @@ function buildLiveKey(sellerName, date, time) {
 
             // [라이브 일정 수집]
             console.log(`🔎 [${item.name}] live 페이지 이동: ${item.url}`);
-            await page.goto(item.url, { waitUntil: 'networkidle' });
-            await page.waitForTimeout(1200);
+            await page.goto(item.url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await page.waitForTimeout(2000);
             const firstLive = await page.waitForSelector('.content-list-item', { timeout: 10000 }).catch(() => null);
             if (!firstLive) {
                 console.log(`   ⚠️ .content-list-item를 찾지 못했습니다. DOM 변경 또는 로딩 지연 가능성`);
