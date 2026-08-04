@@ -12,6 +12,8 @@ jobs:
   track:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    permissions:
+      contents: write # keepalive 빈 커밋 push 용
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,3 +37,23 @@ jobs:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
           CHROMIUM_PATH: /usr/bin/google-chrome
         run: node seller-live.js
+
+      # public 저장소는 커밋이 60일간 없으면 schedule 트리거가 자동으로 꺼진다.
+      # 45일이 넘었을 때만 빈 커밋을 남겨 타이머를 리셋한다.
+      # 크롤러가 실패해도 keepalive는 돌아야 하므로 always() 사용.
+      - name: Keepalive
+        if: always()
+        env:
+          THRESHOLD_DAYS: 45
+        run: |
+          set -euo pipefail
+          age=$(( ( $(date +%s) - $(git log -1 --format=%ct) ) / 86400 ))
+          echo "마지막 커밋으로부터 ${age}일 경과 (임계값 ${THRESHOLD_DAYS}일)"
+          if [ "$age" -lt "$THRESHOLD_DAYS" ]; then
+            echo "여유 있음 — 건너뜀"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: keepalive (스케줄 자동 비활성화 방지)"
+          git push
