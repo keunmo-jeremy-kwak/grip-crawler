@@ -2,9 +2,10 @@ name: Hourly & Daily Tracker
 
 on:
   schedule:
-    # 1. 팔로워 트래킹 (한국 시간 12:07, 00:07, 06:07 -> UTC 03, 15, 21)
+    # A. 팔로워 + 라이브/소식 (한국 시간 12:07, 00:07, 06:07 -> UTC 03, 15, 21)
+    #    ※ 이 문자열을 바꾸면 아래 Follower Tracker 스텝의 if 조건도 함께 고칠 것
     - cron: '7 3,15,21 * * *'
-    # 2. 라이브/소식 (한국 시간 09:07, 15:07 -> UTC 00, 06)
+    # B. 라이브/소식만 (한국 시간 09:07, 15:07 -> UTC 00, 06)
     - cron: '7 0,6 * * *'
   workflow_dispatch: # 수동 실행 버튼 활성화
 
@@ -16,17 +17,20 @@ jobs:
       contents: write # keepalive 빈 커밋 push 용
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
 
       - name: Install dependencies
         run: npm ci
 
+      # FollowerStats 시트는 중복 검사 없이 append 되므로 하루 3회(스케줄 A)로 제한한다.
+      # 수동 실행(workflow_dispatch)은 점검용이라 항상 실행.
       - name: Run Follower Tracker
+        if: github.event_name != 'schedule' || github.event.schedule == '7 3,15,21 * * *'
         env:
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
           CHROMIUM_PATH: /usr/bin/google-chrome
